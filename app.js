@@ -2,11 +2,13 @@ require('dotenv').config()
 require('express-async-errors')
 const express = require('express')
 const app = express()
+const config = require('./config')
 
 const connectDB = require('./db/connect')
 const sendEmail = require('./controllers/sendEmail')
 const verifyEmail = require('./controllers/verifyEmail')
 const consumeRabbitMQ = require('./consumer')
+const amqp = require('amqplib')
 
 // error handler
 const notFoundMiddleware = require('./middleware/not-found')
@@ -14,13 +16,22 @@ const errorHandlerMiddleware = require('./middleware/error-handler')
 
 app.use(express.json())
 
-// routes
-app.route('/').get(consumeRabbitMQ, async (req, res) => {
-	if (req.data) {
-		console.log('Please work:' + req.data.userEmail)
-	}
-	res.send('<h1>Please check your email</h1>')
-	sendEmail(req)
+let channel
+const connect = async () => {
+	const connection = await amqp.connect(config.rabbitMQ.url)
+	channel = await connection.createChannel()
+}
+connect().then(() => {
+	channel.consume(config.rabbitMQ.queue, (message) => {
+		const data = JSON.parse(message.content)
+		console.log(`Received : ${data.userEmail}`)
+		channel.ack(message)
+		sendEmail(data)
+	})
+})
+//routes
+app.route('/').get((req, res) => {
+	res.send('<h1>Email verification</h1>')
 })
 app.get('/verify-email', verifyEmail)
 
