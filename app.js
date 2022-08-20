@@ -7,7 +7,6 @@ const config = require('./config')
 const connectDB = require('./db/connect')
 const sendEmail = require('./controllers/sendEmail')
 const verifyEmail = require('./controllers/verifyEmail')
-const consumeRabbitMQ = require('./consumer')
 const amqp = require('amqplib')
 
 // error handler
@@ -38,10 +37,13 @@ app.get('/verify-email', verifyEmail)
 app.use(notFoundMiddleware)
 app.use(errorHandlerMiddleware)
 
-const port = process.env.PORT || 3000
+const port = process.env.PORT || 3001
+const host = process.env.HOST || '127.0.0.1'
 
 const start = async () => {
-	app.listen(port, () => console.log(`Server is listening on port ${port}...`))
+	app.listen(port, () =>
+		console.log(`Server is listening on port ${port}... && ${host}`)
+	)
 }
 
 start()

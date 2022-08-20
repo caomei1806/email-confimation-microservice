@@ -1,19 +1,7 @@
-FROM node:16-alpine as base
-WORKDIR /src
-COPY package*.json ./
-
-FROM base as production
-ENV NODE_ENV=production
+FROM node:alpine
+WORKDIR /src/bank-emailer
+COPY package*.json .
 RUN npm ci
-COPY ./*.js ./
-CMD ["npm", "start"]
-
-FROM base as dev
-RUN apk add --no-cache bash
-RUN wget -O /bin/wait-for-it.sh https://raw.githubusercontent.com/vishnubob/wait-for-it/master/wait-for-it.sh
-RUN chmod +x /bin/wait-for-it.sh
-
-ENV NODE_ENV=development
-RUN npm install
-COPY ./*.js ./
-CMD ["npm", "start"]
+COPY . .
+EXPOSE 3000
+CMD ["npm","start"]
