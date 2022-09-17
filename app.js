@@ -15,35 +15,46 @@ const errorHandlerMiddleware = require('./middleware/error-handler')
 
 app.use(express.json())
 
+// assign needed queing system info (name of the queue that connects microservices)
+const AMQP_URL = process.env.MESSAGE_QUEUE || config.rabbitMQ.url
+
+// create amqp channel and connect with rabbitmq queue
 let channel
 const connect = async () => {
-	const connection = await amqp.connect(config.rabbitMQ.url)
+	const connection = await amqp.connect(AMQP_URL)
 	channel = await connection.createChannel()
+	channel.assertQueue(config.rabbitMQ.queue, { durable: false })
 }
-connect().then(() => {
-	channel.consume(config.rabbitMQ.queue, (message) => {
-		const data = JSON.parse(message.content)
-		console.log(`Received : ${data.userEmail}`)
-		channel.ack(message)
-		sendEmail(data)
-	})
-})
+
 //routes
 app.route('/').get((req, res) => {
 	res.send('<h1>Email verification</h1>')
 })
+// redirected from verifing url address included in email confirmation
 app.get('/verify-email', verifyEmail)
 
 app.use(notFoundMiddleware)
 app.use(errorHandlerMiddleware)
 
 const port = process.env.PORT || 3001
-const host = process.env.HOST || '127.0.0.1'
 
 const start = async () => {
-	app.listen(port, () =>
-		console.log(`Server is listening on port ${port}... && ${host}`)
-	)
+	// when server successfully started connect to rabbitmq
+	connect()
+		.then(() => {
+			// process all incomming data (users to verify)
+			channel.consume(config.rabbitMQ.queue, (message) => {
+				const data = JSON.parse(message.content)
+				console.log(`Received : ${data.userEmail}`)
+				channel.ack(message)
+				// send verification email
+				sendEmail(data)
+			})
+		})
+		.catch((err) => {
+			console.log(err)
+		})
+	app.listen(port, () => console.log(`Server is running... `))
 }
 
 start()
